@@ -277,7 +277,9 @@ db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"ko
   // Abaikan update rutin (status baterai/internet) dari tablet pemilik koneksi, supaya tidak berbunyi tiap 10 detik
   if(p.eventType==="UPDATE" && n===sel && connected && p.new.kode_sts===ownerKode) return;
   if(p.new && p.new.kode_sts===kode && busy===false && n===sel) { checkStatus(); return; }
-  if(!n || n===sel){ checkStatus(); notify("Info Koneksi", n ? "Data "+n+" berubah" : "Ada koneksi dihapus"); }
+  // Alarm hanya untuk tablet yang namanya (nama_tab_sts) dipilih DAN kodenya (kode_sts) terdaftar di tablet ini
+  const milikSaya = sel && connected && ownerKode===kode;
+  if(!n || n===sel){ checkStatus(); if(milikSaya) notify("Info Koneksi", n ? "Data "+n+" berubah" : "Ada koneksi dihapus"); }
 }).subscribe();
 
 /* ---------- Online / Offline ---------- */
