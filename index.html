@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Koneksi Tablet</title>
+<style>
+:root{--bg1:#eef2ff;--bg2:#e0e7ff;--card:rgba(255,255,255,.85);--txt:#1e1b4b;--mut:#6b7280;--pri:#4f46e5;--pri2:#7c3aed;--ok:#16a34a;--okbg:#dcfce7;--bad:#dc2626;--badbg:#fee2e2;--bd:#e5e7eb}
+@media(prefers-color-scheme:dark){:root{--bg1:#0f1024;--bg2:#1b1b3a;--card:rgba(30,30,60,.85);--txt:#eef2ff;--mut:#9ca3af;--okbg:#14532d;--badbg:#7f1d1d;--bd:#33335c}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:linear-gradient(135deg,var(--bg1),var(--bg2));padding:calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 20px);display:flex;justify-content:center;align-items:flex-start;min-height:100vh}
+.wrap{width:100%;max-width:440px;display:grid;gap:14px}
+.card{background:var(--card);backdrop-filter:blur(14px);border:1px solid var(--bd);border-radius:22px;padding:20px;box-shadow:0 10px 30px rgba(79,70,229,.12);animation:up .6s cubic-bezier(.2,.8,.2,1) both}
+.card:nth-child(2){animation-delay:.1s}.card:nth-child(3){animation-delay:.2s}
+@keyframes up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+h1{margin:0 0 2px;font-size:22px;background:linear-gradient(90deg,var(--pri),var(--pri2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin:0 0 18px;color:var(--mut);font-size:13px}
+label{font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.row{display:flex;gap:10px;align-items:center;margin-top:8px}
+select{flex:1;min-width:0;padding:13px 12px;border-radius:14px;border:1.5px solid var(--bd);background:transparent;color:var(--txt);font-size:15px;outline:none;transition:.2s}
+select:focus{border-color:var(--pri);box-shadow:0 0 0 4px rgba(79,70,229,.15)}
+select option{color:#111}
+.badge{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap;transition:.35s;background:var(--bd);color:var(--mut)}
+.badge i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.badge.ok{background:var(--okbg);color:var(--ok)}.badge.bad{background:var(--badbg);color:var(--bad)}
+.badge.ok i,.badge.bad i{animation:pulse 1.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.badge.load i{animation:spin .8s linear infinite;border-radius:50%;background:none;border:2px solid currentColor;border-top-color:transparent;width:11px;height:11px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn{width:100%;margin-top:16px;padding:15px;border:0;border-radius:16px;font-size:16px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--pri),var(--pri2));cursor:pointer;box-shadow:0 8px 20px rgba(79,70,229,.35);transition:transform .15s,box-shadow .2s,opacity .2s}
+.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5;box-shadow:none}
+.btn.ghost{background:transparent;color:var(--pri);border:1.5px solid var(--pri);box-shadow:none;margin-top:0;padding:11px;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mini{border:1px solid var(--bd);border-radius:16px;padding:14px;transition:.3s}
+.mini small{color:var(--mut);font-size:12px}.mini b{display:block;font-size:20px;margin-top:4px}
+.bat{height:8px;border-radius:9px;background:var(--bd);overflow:hidden;margin-top:8px}
+.bat div{height:100%;width:0;border-radius:9px;background:var(--ok);transition:width .6s,background .3s}
+.code{font:12px ui-monospace,monospace;color:var(--mut);text-align:center;margin-top:12px;word-break:break-all}
+.ov{position:fixed;inset:0;background:rgba(15,16,36,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:.25s;z-index:10}
+.ov.show{opacity:1;pointer-events:auto}
+.modal{background:var(--bg1);color:var(--txt);border-radius:22px;padding:24px;max-width:340px;width:100%;text-align:center;transform:scale(.88);transition:.3s cubic-bezier(.2,1.3,.4,1)}
+.ov.show .modal{transform:scale(1)}
+.modal h3{margin:0 0 8px}.modal p{margin:0 0 18px;color:var(--mut);font-size:14px}
+.modal .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal .btn{margin:0;padding:12px;font-size:15px}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-120px);background:var(--txt);color:var(--bg1);padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;transition:.4s cubic-bezier(.2,1.2,.4,1);z-index:20;max-width:90%;text-align:center}
+.toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Koneksi Tablet</h1>
+    <p class="sub">Pilih tablet lalu hubungkan perangkat ini.</p>
+    <label for="tab">Nama Tablet</label>
+    <div class="row">
+      <select id="tab"><option value="">Memuat data…</option></select>
+      <span id="badge" class="badge"><i></i><span>-</span></span>
+    </div>
+    <button id="btn" class="btn" disabled>Hubungkan</button>
+    <div class="code">Kode perangkat: <span id="kode"></span></div>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div class="mini"><small>Jaringan</small><b id="net">-</b></div>
+      <div class="mini"><small>Baterai</small><b id="batv">-</b><div class="bat"><div id="batbar"></div></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <button id="perm" class="btn ghost">🔔 Aktifkan Notifikasi &amp; Suara</button>
+  </div>
+</div>
+
+<div id="ov" class="ov"><div class="modal">
+  <h3>Perbarui Koneksi?</h3>
+  <p>Apakah Anda yakin memperbarui koneksi di tablet ini?</p>
+  <div class="acts"><button id="no" class="btn ghost">Tidak</button><button id="yes" class="btn">Iya</button></div>
+</div></div>
+<div id="toast" class="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const SUPABASE_URL = 'https://vxsopsnopeurnxdkfsbe.supabase.co'; 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4c29wc25vcGV1cm54ZGtmc2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1NzM4MjgsImV4cCI6MjEwOTE0OTgyOH0.53GRhBd5Pvjjcqbh4M9ok7HKfqJs7klyxPqomXMEzus'; 
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+
+// Kode unik perangkat (disimpan permanen di browser/PWA ini)
+let kode = localStorage.getItem("kode_sts");
+if (!kode) { kode = "TAB-" + crypto.randomUUID().slice(0,13).toUpperCase(); localStorage.setItem("kode_sts", kode); }
+$("kode").textContent = kode;
+
+let sel = localStorage.getItem("tab_dipilih") || "", connected = false, busy = false;
+
+/* ---------- UI helpers ---------- */
+function toast(t){ const e=$("toast"); e.textContent=t; e.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>e.classList.remove("show"),3000); }
+function setBadge(state){
+  const b=$("badge"); b.className="badge "+state;
+  b.lastChild.textContent = {ok:"Terkoneksi",bad:"Belum Terkoneksi",load:"Mengecek…",none:"-"}[state];
+  if(state==="ok"||state==="bad"){ $("btn").textContent = connected ? "Perbarui Koneksi" : "Hubungkan"; }
+  $("btn").disabled = !(sel && (state==="ok"||state==="bad"));
+}
+
+/* ---------- Suara & notifikasi ---------- */
+let ac;
+function unlockAudio(){ ac = ac || new (window.AudioContext||window.webkitAudioContext)(); if(ac.state==="suspended") ac.resume(); }
+function playSound(){
+  try{ unlockAudio(); [880,1175,1568].forEach((f,i)=>{
+    const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*.18;
+    o.frequency.value=f; o.type="sine"; g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(.4,t+.03); g.gain.exponentialRampToValueAtTime(.0001,t+.17);
+    o.connect(g).connect(ac.destination); o.start(t); o.stop(t+.18);
+  }); }catch(e){}
+}
+async function notify(title, body){
+  playSound(); toast(title+" — "+body);
+  if("Notification" in window && Notification.permission==="granted"){
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification(title,{body,icon:"/icon-192.png",badge:"/icon-192.png",vibrate:[200,100,200],tag:"tablet"});
+  }
+}
+$("perm").onclick = async()=>{
+  unlockAudio(); playSound();
+  if(!("Notification" in window)) return toast("Browser belum mendukung notifikasi. Di iOS, install dulu ke Layar Utama.");
+  const r = await Notification.requestPermission();
+  toast(r==="granted" ? "Notifikasi aktif ✅" : "Izin notifikasi ditolak");
+};
+document.addEventListener("click", unlockAudio, {once:true});
+
+/* ---------- Data Supabase ---------- */
+async function loadTablets(){
+  const {data,error} = await db.from("data_tablet").select("nama_tab").order("nama_tab");
+  const s=$("tab");
+  if(error){ s.innerHTML='<option value="">Gagal memuat data</option>'; return toast("Gagal: "+error.message); }
+  const names=[...new Set(data.map(d=>d.nama_tab).filter(Boolean))];
+  s.innerHTML='<option value="">— Pilih tablet —</option>'+names.map(n=>`<option>${n}</option>`).join("");
+  if(names.includes(sel)){ s.value=sel; checkStatus(); } else sel="";
+}
+async function checkStatus(){
+  if(!sel){ connected=false; return setBadge("none"); }
+  setBadge("load");
+  const {data,error} = await db.from("koneksi_tablet").select("id").eq("nama_tab_sts",sel).limit(1);
+  if(error){ setBadge("none"); return toast("Gagal cek: "+error.message); }
+  connected = data.length>0; setBadge(connected?"ok":"bad");
+}
+$("tab").onchange = e=>{ sel=e.target.value; localStorage.setItem("tab_dipilih",sel); checkStatus(); };
+
+async function simpan(){
+  if(busy) return; busy=true; $("btn").disabled=true;
+  let error;
+  if(!connected){
+    ({error} = await db.from("koneksi_tablet").insert({nama_tab_sts:sel,kode_sts:kode,status_sts:"AKTIF"}));
+  } else {
+    ({error} = await db.from("koneksi_tablet").update({kode_sts:kode,status_sts:"AKTIF"}).eq("nama_tab_sts",sel));
+  }
+  busy=false;
+  if(error){ toast("Gagal: "+error.message); return checkStatus(); }
+  await checkStatus(); notify("Berhasil","Koneksi "+sel+" tersimpan");
+}
+$("btn").onclick = ()=>{ if(!sel) return; connected ? $("ov").classList.add("show") : simpan(); };
+$("no").onclick = ()=>$("ov").classList.remove("show");
+$("yes").onclick = ()=>{ $("ov").classList.remove("show"); simpan(); };
+
+/* ---------- Realtime: notifikasi + suara saat data koneksi berubah ---------- */
+db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"koneksi_tablet"},p=>{
+  const n = p.new && p.new.nama_tab_sts;
+  if(p.new && p.new.kode_sts===kode && busy===false && n===sel) { checkStatus(); return; }
+  if(!n || n===sel){ checkStatus(); notify("Info Koneksi", n ? "Data "+n+" berubah" : "Ada koneksi dihapus"); }
+}).subscribe();
+
+/* ---------- Online / Offline ---------- */
+function updNet(first){
+  const on=navigator.onLine; $("net").textContent=on?"🟢 Online":"🔴 Offline"; $("net").style.color=on?"var(--ok)":"var(--bad)";
+  if(!first){ notify("Jaringan", on?"Perangkat kembali online":"Perangkat offline"); if(on) checkStatus(); }
+}
+addEventListener("online",()=>updNet()); addEventListener("offline",()=>updNet()); updNet(true);
+
+/* ---------- Baterai (Chrome/Android; tidak didukung iOS) ---------- */
+if(navigator.getBattery){
+  navigator.getBattery().then(b=>{
+    let warned=false;
+    const upd=()=>{ const p=Math.round(b.level*100);
+      $("batv").textContent=p+"% "+(b.charging?"⚡":""); const bar=$("batbar");
+      bar.style.width=p+"%"; bar.style.background=p<=20?"var(--bad)":p<=50?"#f59e0b":"var(--ok)";
+      if(p<=20&&!b.charging&&!warned){warned=true;notify("Baterai Rendah","Tersisa "+p+"%");} if(p>20||b.charging) warned=false; };
+    upd(); b.onlevelchange=upd; b.onchargingchange=upd;
+  });
+} else { $("batv").textContent="N/A"; $("batv").style.fontSize="14px"; }
+
+/* ---------- Init ---------- */
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+loadTablets();
+</script>
+</body>
+</html>
