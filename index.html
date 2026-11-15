@@ -71,6 +71,20 @@ select option{color:#111}
 .modal .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal .btn{margin:0;padding:12px;font-size:15px}
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-120px);background:var(--txt);color:var(--bg1);padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;transition:.4s cubic-bezier(.2,1.2,.4,1);z-index:20;max-width:90%;text-align:center;box-shadow:0 10px 26px rgba(0,0,0,.25)}
 .toast.show{transform:translate(-50%,0)}
+/* kolom password pada dialog Perbarui Koneksi */
+.pwbox{position:relative;margin:0 0 6px;text-align:left}
+.pwin{width:100%;padding:13px 46px 13px 14px;border-radius:14px;border:1.5px solid var(--bd);background:transparent;color:var(--txt);font-size:15px;outline:none;transition:.2s;letter-spacing:.04em}
+.pwin:hover{border-color:var(--pri)}
+.pwin:focus{border-color:var(--pri);box-shadow:0 0 0 4px rgba(79,70,229,.15)}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-size:17px;cursor:pointer;transition:.2s}
+.eye:hover{background:rgba(79,70,229,.1);color:var(--pri)}
+.pwerr{min-height:18px;margin:6px 0 12px;font-size:12.5px;font-weight:600;color:var(--bad);text-align:left;opacity:0;transform:translateY(-4px);transition:.25s}
+.pwerr.show{opacity:1;transform:none}
+.pwbox.err .pwin{border-color:var(--bad);box-shadow:0 0 0 4px rgba(220,38,38,.15)}
+.pwbox.shake{animation:shake .45s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
+.lock{font-size:34px;line-height:1;margin-bottom:6px;display:inline-block;animation:float 2.4s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -103,8 +117,14 @@ select option{color:#111}
 </div>
 
 <div id="ov" class="ov"><div class="modal">
+  <div class="lock">🔒</div>
   <h3>Perbarui Koneksi?</h3>
-  <p>Apakah Anda yakin memperbarui koneksi di tablet ini?</p>
+  <p>Apakah Anda yakin memperbarui koneksi di tablet ini? Masukkan password untuk melanjutkan.</p>
+  <div id="pwbox" class="pwbox">
+    <input id="pw" class="pwin" type="password" placeholder="Masukkan password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Password perbarui koneksi">
+    <button id="eye" class="eye" type="button" aria-label="Tampilkan/sembunyikan password">👁</button>
+  </div>
+  <div id="pwerr" class="pwerr" role="alert"></div>
   <div class="acts"><button id="no" class="btn ghost">Tidak</button><button id="yes" class="btn">Iya</button></div>
 </div></div>
 <div id="toast" class="toast"></div>
@@ -116,6 +136,14 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Kunci PUBLIK VAPID untuk Web Push (isi setelah menjalankan: npx web-push generate-vapid-keys)
 const VAPID_PUBLIC_KEY = 'ISI_VAPID_PUBLIC_KEY_DI_SINI';
 const INTERVAL_KIRIM = 10000; // 10 detik
+// ==================================================================================
+// PASSWORD "PERBARUI KONEKSI"
+// Ubah password di sini jika ingin menggantinya di kemudian hari (cukup ganti teks
+// di antara tanda petik), lalu simpan, commit ke GitHub, dan Vercel akan deploy ulang.
+// Password salah  -> tidak ada data yang diperbarui.
+// Password benar  -> koneksi diperbarui seperti biasa.
+// ==================================================================================
+const PASSWORD_PERBARUI = 'kingemyu';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 
@@ -267,9 +295,28 @@ async function simpan(){
   if(error){ toast("Gagal: "+error.message); return checkStatus(); }
   await checkStatus(); daftarPush(); notify("Berhasil","Koneksi "+sel+" tersimpan");
 }
-$("btn").onclick = ()=>{ if(!sel) return; connected ? $("ov").classList.add("show") : simpan(); };
-$("no").onclick = ()=>$("ov").classList.remove("show");
-$("yes").onclick = ()=>{ $("ov").classList.remove("show"); simpan(); };
+function bukaModal(){
+  $("pw").value=""; $("pw").type="password"; $("eye").textContent="👁";
+  $("pwbox").classList.remove("err","shake"); $("pwerr").classList.remove("show"); $("pwerr").textContent="";
+  $("ov").classList.add("show"); setTimeout(()=>$("pw").focus(),300);
+}
+function tutupModal(){ $("ov").classList.remove("show"); $("pw").value=""; $("pw").blur(); }
+function passwordSalah(){
+  const b=$("pwbox"); b.classList.remove("shake"); void b.offsetWidth; b.classList.add("err","shake");
+  $("pwerr").textContent="Password salah. Koneksi tidak diperbarui."; $("pwerr").classList.add("show");
+  $("pw").value=""; $("pw").focus(); toast("Password salah — tidak ada data yang diperbarui");
+}
+function prosesPerbarui(){
+  if($("pw").value !== PASSWORD_PERBARUI) return passwordSalah(); // salah: berhenti, tidak ada yang diperbarui
+  tutupModal(); simpan();                                          // benar: perbarui data seperti sebelumnya
+}
+$("btn").onclick = ()=>{ if(!sel) return; connected ? bukaModal() : simpan(); };
+$("no").onclick = tutupModal;
+$("yes").onclick = prosesPerbarui;
+$("pw").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); prosesPerbarui(); } });
+$("pw").addEventListener("input",()=>{ $("pwbox").classList.remove("err"); $("pwerr").classList.remove("show"); });
+$("eye").onclick = ()=>{ const t=$("pw").type==="password"; $("pw").type=t?"text":"password"; $("eye").textContent=t?"🙈":"👁"; $("pw").focus(); };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape" && $("ov").classList.contains("show")) tutupModal(); });
 
 /* ---------- Realtime: notifikasi + suara saat data koneksi berubah ---------- */
 db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"koneksi_tablet"},p=>{
