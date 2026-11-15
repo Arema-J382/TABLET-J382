@@ -143,27 +143,32 @@ const jam = () => new Date().toLocaleTimeString("id-ID",{hour12:false});
 /* ---------- Suara & notifikasi ---------- */
 let ac;
 function unlockAudio(){ ac = ac || new (window.AudioContext||window.webkitAudioContext)(); if(ac.state==="suspended") ac.resume(); }
+// Alarm dalam aplikasi: amplitudo maksimum (gain 1) lewat kompresor, 6 nada keras.
+// Kerasnya mengikuti volume MEDIA perangkat; di volume 100% inilah batas paling keras yang bisa dicapai web.
 function playSound(){
-  try{ unlockAudio(); [880,1175,1568].forEach((f,i)=>{
-    const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*.18;
-    o.frequency.value=f; o.type="sine"; g.gain.setValueAtTime(.0001,t);
-    g.gain.exponentialRampToValueAtTime(.4,t+.03); g.gain.exponentialRampToValueAtTime(.0001,t+.17);
-    o.connect(g).connect(ac.destination); o.start(t); o.stop(t+.18);
-  }); }catch(e){}
+  try{
+    unlockAudio();
+    const comp=ac.createDynamicsCompressor(), master=ac.createGain();
+    master.gain.value=1; comp.connect(master).connect(ac.destination);
+    [880,1175,1568,880,1175,1568].forEach((f,i)=>{
+      const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*.22;
+      o.frequency.value=f; o.type="square"; g.gain.setValueAtTime(.0001,t);
+      g.gain.exponentialRampToValueAtTime(1,t+.02); g.gain.setValueAtTime(1,t+.15); g.gain.exponentialRampToValueAtTime(.0001,t+.21);
+      o.connect(g).connect(comp); o.start(t); o.stop(t+.22);
+    });
+  }catch(e){}
 }
-// Suara & getar mengikuti pengaturan notifikasi di perangkat (nada, volume, Jangan ganggu).
-// Nada buatan aplikasi hanya dipakai sebagai cadangan jika notifikasi sistem tidak diizinkan.
+// Notifikasi sistem (nada & volume mengikuti pengaturan perangkat). Jika aplikasi sedang terbuka,
+// alarm keras ikut dibunyikan supaya pasti terdengar.
 async function notify(title, body){
   toast(title+" — "+body);
-  let sistem = false;
   if("Notification" in window && Notification.permission==="granted"){
     try{
       const reg = await navigator.serviceWorker.ready;
       await reg.showNotification(title,{body,icon:"/icon-192.png",badge:"/icon-192.png",tag:"tablet",renotify:true,silent:false});
-      sistem = true;
     }catch(e){}
   }
-  if(!sistem) playSound();
+  if(document.visibilityState==="visible") playSound();
 }
 
 /* ---------- Web Push (agar notifikasi + suara tetap muncul saat PWA ditutup) ---------- */
