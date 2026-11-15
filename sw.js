@@ -9,20 +9,15 @@ self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil
 self.addEventListener('push',e=>{
   let d={};
   try{d=e.data.json()}catch(_){d={title:'Koneksi Tablet',body:e.data?e.data.text():''}}
-  e.waitUntil((async()=>{
-    await self.registration.showNotification(d.title||'Koneksi Tablet',{
-      body:d.body||'',
-      icon:'/icon-192.png',
-      badge:'/icon-192.png',
-      vibrate:[300,150,300,150,300],
-      tag:d.tag||'tablet',
-      renotify:true,
-      requireInteraction:true,
-      silent:false,
-      data:d
-    });
-    // Jika ada jendela aplikasi yang masih hidup (mis. di latar belakang), minta ia membunyikan suara juga
-    const list=await clients.matchAll({type:'window',includeUncontrolled:true});
-    list.forEach(c=>c.postMessage({type:'play'}));
-  })());
+  // Suara & getar sepenuhnya mengikuti pengaturan notifikasi perangkat (silent:false = pakai nada sistem)
+  e.waitUntil(self.registration.showNotification(d.title||'Koneksi Tablet',{
+    body:d.body||'',
+    icon:'/icon-192.png',
+    badge:'/icon-192.png',
+    tag:d.tag||'tablet',
+    renotify:true,
+    requireInteraction:true,
+    silent:false,
+    data:d
+  }));
 });
