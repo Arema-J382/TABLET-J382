@@ -151,12 +151,19 @@ function playSound(){
     o.connect(g).connect(ac.destination); o.start(t); o.stop(t+.18);
   }); }catch(e){}
 }
+// Suara & getar mengikuti pengaturan notifikasi di perangkat (nada, volume, Jangan ganggu).
+// Nada buatan aplikasi hanya dipakai sebagai cadangan jika notifikasi sistem tidak diizinkan.
 async function notify(title, body){
-  playSound(); toast(title+" — "+body);
+  toast(title+" — "+body);
+  let sistem = false;
   if("Notification" in window && Notification.permission==="granted"){
-    const reg = await navigator.serviceWorker.ready;
-    reg.showNotification(title,{body,icon:"/icon-192.png",badge:"/icon-192.png",vibrate:[200,100,200],tag:"tablet",renotify:true,silent:false});
+    try{
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(title,{body,icon:"/icon-192.png",badge:"/icon-192.png",tag:"tablet",renotify:true,silent:false});
+      sistem = true;
+    }catch(e){}
   }
+  if(!sistem) playSound();
 }
 
 /* ---------- Web Push (agar notifikasi + suara tetap muncul saat PWA ditutup) ---------- */
@@ -172,15 +179,12 @@ async function daftarPush(){
   }catch(e){ console.warn("Push gagal:",e); }
 }
 $("perm").onclick = async()=>{
-  unlockAudio(); playSound();
-  if(!("Notification" in window)) return toast("Browser belum mendukung notifikasi. Di iOS, install dulu ke Layar Utama.");
+  if(!("Notification" in window)){ unlockAudio(); playSound(); return toast("Browser belum mendukung notifikasi. Di iOS, install dulu ke Layar Utama."); }
   const r = await Notification.requestPermission();
-  toast(r==="granted" ? "Notifikasi aktif ✅" : "Izin notifikasi ditolak");
-  if(r==="granted") daftarPush();
+  if(r==="granted"){ daftarPush(); notify("Notifikasi aktif ✅","Suara mengikuti pengaturan perangkat"); }
+  else toast("Izin notifikasi ditolak");
 };
 document.addEventListener("click", unlockAudio, {once:true});
-// Jika service worker menerima push saat aplikasi terbuka, bunyikan suara juga
-if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message",e=>{ if(e.data && e.data.type==="play") playSound(); });
 
 /* ---------- Informasi jaringan & baterai ---------- */
 function getNet(){
