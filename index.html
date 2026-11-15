@@ -149,7 +149,8 @@ async function loadTablets(){
   const {data,error} = await db.from("data_tablet").select("nama_tab").order("nama_tab");
   const s=$("tab");
   if(error){ s.innerHTML='<option value="">Gagal memuat data</option>'; return toast("Gagal: "+error.message); }
-  const names=[...new Set(data.map(d=>d.nama_tab).filter(Boolean))];
+  const names=[...new Set(data.map(d=>d.nama_tab).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,"id",{numeric:true,sensitivity:"base"})); // urut natural: B-1, B-2, ... B-10
   s.innerHTML='<option value="">— Pilih tablet —</option>'+names.map(n=>`<option>${n}</option>`).join("");
   if(names.includes(sel)){ s.value=sel; checkStatus(); } else sel="";
 }
