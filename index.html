@@ -48,9 +48,21 @@ select option{color:#111}
 .mini{border:1px solid var(--bd);border-radius:16px;padding:14px;transition:.3s}
 .mini:hover{border-color:var(--pri)}
 .mini small{color:var(--mut);font-size:12px}.mini b{display:block;font-size:20px;margin-top:4px}
+.mini .nm{display:block;margin-top:4px;font-size:11.5px;color:var(--mut);min-height:14px;word-break:break-word}
 .bat{height:8px;border-radius:9px;background:var(--bd);overflow:hidden;margin-top:8px}
 .bat div{height:100%;width:0;border-radius:9px;background:var(--ok);transition:width .6s,background .3s}
 .code{font:12px ui-monospace,monospace;color:var(--mut);text-align:center;margin-top:12px;word-break:break-all}
+/* indikator sinkron 10 detik */
+.sync{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--mut);justify-content:center;text-align:center}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none;transition:background .3s}
+.sync.ok i{background:var(--ok);animation:pulse 1.6s infinite;color:var(--ok)}
+.sync.bad i{background:var(--bad)}
+.sync.send i{background:var(--pri);animation:blink .5s infinite alternate}
+@keyframes blink{from{opacity:.3}to{opacity:1}}
+.cd{height:3px;border-radius:9px;background:var(--bd);overflow:hidden;margin-top:8px}
+.cd div{height:100%;width:0;background:linear-gradient(90deg,var(--pri),var(--pri2));border-radius:9px}
+.cd.run div{animation:cdown 10s linear infinite}
+@keyframes cdown{from{width:0}to{width:100%}}
 .ov{position:fixed;inset:0;background:rgba(15,16,36,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:.25s;z-index:10}
 .ov.show{opacity:1;pointer-events:auto}
 .modal{background:var(--bg1);color:var(--txt);border-radius:22px;padding:24px;max-width:340px;width:100%;text-align:center;transform:scale(.88);transition:.3s cubic-bezier(.2,1.3,.4,1)}
@@ -78,9 +90,11 @@ select option{color:#111}
 
   <div class="card">
     <div class="grid">
-      <div class="mini"><small>Jaringan</small><b id="net">-</b></div>
+      <div class="mini"><small>Jaringan</small><b id="net">-</b><span id="netname" class="nm"></span></div>
       <div class="mini"><small>Baterai</small><b id="batv">-</b><div class="bat"><div id="batbar"></div></div></div>
     </div>
+    <div id="sync" class="sync"><i></i><span id="synctxt">Pengiriman status belum aktif</span></div>
+    <div id="cd" class="cd"><div></div></div>
   </div>
 
   <div class="card">
@@ -99,6 +113,9 @@ select option{color:#111}
 <script>
 const SUPABASE_URL = 'https://vxsopsnopeurnxdkfsbe.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4c29wc25vcGV1cm54ZGtmc2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1NzM4MjgsImV4cCI6MjEwOTE0OTgyOH0.53GRhBd5Pvjjcqbh4M9ok7HKfqJs7klyxPqomXMEzus'; 
+// Kunci PUBLIK VAPID untuk Web Push (isi setelah menjalankan: npx web-push generate-vapid-keys)
+const VAPID_PUBLIC_KEY = 'ISI_VAPID_PUBLIC_KEY_DI_SINI';
+const INTERVAL_KIRIM = 10000; // 10 detik
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 
@@ -107,7 +124,7 @@ let kode = localStorage.getItem("kode_sts");
 if (!kode) { kode = "TAB-" + crypto.randomUUID().slice(0,13).toUpperCase(); localStorage.setItem("kode_sts", kode); }
 $("kode").textContent = kode;
 
-let sel = localStorage.getItem("tab_dipilih") || "", connected = false, busy = false;
+let sel = localStorage.getItem("tab_dipilih") || "", connected = false, busy = false, ownerKode = null, bat = null, sending = false;
 
 /* ---------- UI helpers ---------- */
 function toast(t){ const e=$("toast"); e.textContent=t; e.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>e.classList.remove("show"),3000); }
@@ -117,6 +134,11 @@ function setBadge(state){
   if(state==="ok"||state==="bad"){ $("btn").textContent = connected ? "Perbarui Koneksi" : "Hubungkan"; }
   $("btn").disabled = !(sel && (state==="ok"||state==="bad"));
 }
+function setSync(state, txt){
+  $("sync").className = "sync " + state; $("synctxt").textContent = txt;
+  $("cd").classList.toggle("run", state==="ok"||state==="send");
+}
+const jam = () => new Date().toLocaleTimeString("id-ID",{hour12:false});
 
 /* ---------- Suara & notifikasi ---------- */
 let ac;
@@ -133,16 +155,76 @@ async function notify(title, body){
   playSound(); toast(title+" — "+body);
   if("Notification" in window && Notification.permission==="granted"){
     const reg = await navigator.serviceWorker.ready;
-    reg.showNotification(title,{body,icon:"/icon-192.png",badge:"/icon-192.png",vibrate:[200,100,200],tag:"tablet"});
+    reg.showNotification(title,{body,icon:"/icon-192.png",badge:"/icon-192.png",vibrate:[200,100,200],tag:"tablet",renotify:true,silent:false});
   }
+}
+
+/* ---------- Web Push (agar notifikasi + suara tetap muncul saat PWA ditutup) ---------- */
+function urlB64(s){ const p="=".repeat((4-s.length%4)%4), b=(s+p).replace(/-/g,"+").replace(/_/g,"/"), r=atob(b); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); }
+async function daftarPush(){
+  try{
+    if(!sel || !("PushManager" in window) || !VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith("ISI_")) return;
+    if(Notification.permission!=="granted") return;
+    const reg = await navigator.serviceWorker.ready;
+    let s = await reg.pushManager.getSubscription();
+    if(!s) s = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64(VAPID_PUBLIC_KEY)});
+    await db.rpc("simpan_push",{p_kode:kode, p_nama:sel, p_sub:s.toJSON()});
+  }catch(e){ console.warn("Push gagal:",e); }
 }
 $("perm").onclick = async()=>{
   unlockAudio(); playSound();
   if(!("Notification" in window)) return toast("Browser belum mendukung notifikasi. Di iOS, install dulu ke Layar Utama.");
   const r = await Notification.requestPermission();
   toast(r==="granted" ? "Notifikasi aktif ✅" : "Izin notifikasi ditolak");
+  if(r==="granted") daftarPush();
 };
 document.addEventListener("click", unlockAudio, {once:true});
+// Jika service worker menerima push saat aplikasi terbuka, bunyikan suara juga
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message",e=>{ if(e.data && e.data.type==="play") playSound(); });
+
+/* ---------- Informasi jaringan & baterai ---------- */
+function getNet(){
+  const on = navigator.onLine;
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  let nama = "";
+  if(on && c){
+    const tipe = {wifi:"WiFi",cellular:"Seluler",ethernet:"Ethernet",bluetooth:"Bluetooth",wimax:"WiMAX",other:"Lainnya"}[c.type] || "";
+    const gen = c.effectiveType ? c.effectiveType.toUpperCase() : "";
+    nama = [tipe,gen].filter(Boolean).join(" ");
+  }
+  return {on, nama};
+}
+
+/* ---------- Kirim status baterai & internet ke Supabase tiap 10 detik ---------- */
+async function kirimStatus(){
+  if(!sel || !connected || sending) return;
+  if(ownerKode && ownerKode!==kode) return setSync("bad","Tablet ini terhubung ke perangkat lain");
+  if(!navigator.onLine) return setSync("bad","Offline — menunggu jaringan…");
+  sending = true; setSync("send","Mengirim status…");
+  const n = getNet();
+  const payload = {
+    status_internet: n.on ? "ONLINE"+(n.nama?" - "+n.nama:"") : "OFFLINE",
+    terakhir_update: new Date().toISOString()
+  };
+  if(bat) payload.status_baterai = Math.round(bat.level*100);
+  const {data,error} = await db.from("koneksi_tablet").update(payload).eq("nama_tab_sts",sel).eq("kode_sts",kode).select("id");
+  sending = false;
+  if(error) return setSync("bad","Gagal kirim: "+error.message);
+  if(!data || !data.length) return setSync("bad","Data koneksi tablet tidak ditemukan");
+  setSync("ok","Status terkirim "+jam()+" · otomatis tiap 10 detik");
+}
+setInterval(kirimStatus, INTERVAL_KIRIM);
+
+/* ---------- Jaga layar tetap menyala agar pengiriman 10 detik tidak terhenti ---------- */
+let wl = null;
+async function jagaLayar(){
+  try{
+    if("wakeLock" in navigator && connected && document.visibilityState==="visible" && !wl){
+      wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release",()=>{ wl=null; });
+    }
+  }catch(e){}
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ jagaLayar(); kirimStatus(); } });
 
 /* ---------- Data Supabase ---------- */
 async function loadTablets(){
@@ -152,16 +234,17 @@ async function loadTablets(){
   const names=[...new Set(data.map(d=>d.nama_tab).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,"id",{numeric:true,sensitivity:"base"})); // urut natural: B-1, B-2, ... B-10
   s.innerHTML='<option value="">— Pilih tablet —</option>'+names.map(n=>`<option>${n}</option>`).join("");
-  if(names.includes(sel)){ s.value=sel; checkStatus(); } else sel="";
+  if(names.includes(sel)){ s.value=sel; checkStatus(); daftarPush(); } else sel="";
 }
 async function checkStatus(){
-  if(!sel){ connected=false; return setBadge("none"); }
+  if(!sel){ connected=false; ownerKode=null; setSync("","Pengiriman status belum aktif"); return setBadge("none"); }
   setBadge("load");
-  const {data,error} = await db.from("koneksi_tablet").select("id").eq("nama_tab_sts",sel).limit(1);
+  const {data,error} = await db.from("koneksi_tablet").select("id,kode_sts").eq("nama_tab_sts",sel).limit(1);
   if(error){ setBadge("none"); return toast("Gagal cek: "+error.message); }
-  connected = data.length>0; setBadge(connected?"ok":"bad");
+  connected = data.length>0; ownerKode = connected ? data[0].kode_sts : null; setBadge(connected?"ok":"bad");
+  if(connected){ kirimStatus(); jagaLayar(); } else setSync("","Hubungkan tablet untuk mulai mengirim status");
 }
-$("tab").onchange = e=>{ sel=e.target.value; localStorage.setItem("tab_dipilih",sel); checkStatus(); };
+$("tab").onchange = e=>{ sel=e.target.value; localStorage.setItem("tab_dipilih",sel); checkStatus(); daftarPush(); };
 
 async function simpan(){
   if(busy) return; busy=true; $("btn").disabled=true;
@@ -173,7 +256,7 @@ async function simpan(){
   }
   busy=false;
   if(error){ toast("Gagal: "+error.message); return checkStatus(); }
-  await checkStatus(); notify("Berhasil","Koneksi "+sel+" tersimpan");
+  await checkStatus(); daftarPush(); notify("Berhasil","Koneksi "+sel+" tersimpan");
 }
 $("btn").onclick = ()=>{ if(!sel) return; connected ? $("ov").classList.add("show") : simpan(); };
 $("no").onclick = ()=>$("ov").classList.remove("show");
@@ -182,26 +265,32 @@ $("yes").onclick = ()=>{ $("ov").classList.remove("show"); simpan(); };
 /* ---------- Realtime: notifikasi + suara saat data koneksi berubah ---------- */
 db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"koneksi_tablet"},p=>{
   const n = p.new && p.new.nama_tab_sts;
+  // Abaikan update rutin (status baterai/internet) dari tablet pemilik koneksi, supaya tidak berbunyi tiap 10 detik
+  if(p.eventType==="UPDATE" && n===sel && connected && p.new.kode_sts===ownerKode) return;
   if(p.new && p.new.kode_sts===kode && busy===false && n===sel) { checkStatus(); return; }
   if(!n || n===sel){ checkStatus(); notify("Info Koneksi", n ? "Data "+n+" berubah" : "Ada koneksi dihapus"); }
 }).subscribe();
 
 /* ---------- Online / Offline ---------- */
 function updNet(first){
-  const on=navigator.onLine; $("net").textContent=on?"🟢 Online":"🔴 Offline"; $("net").style.color=on?"var(--ok)":"var(--bad)";
-  if(!first){ notify("Jaringan", on?"Perangkat kembali online":"Perangkat offline"); if(on) checkStatus(); }
+  const {on,nama}=getNet(); $("net").textContent=on?"🟢 Online":"🔴 Offline"; $("net").style.color=on?"var(--ok)":"var(--bad)";
+  $("netname").textContent = on ? (nama || "") : "Tidak ada jaringan";
+  if(!first){ notify("Jaringan", on?"Perangkat kembali online":"Perangkat offline"); if(on){ checkStatus(); } else setSync("bad","Offline — menunggu jaringan…"); }
 }
 addEventListener("online",()=>updNet()); addEventListener("offline",()=>updNet()); updNet(true);
+// Perubahan tipe jaringan (WiFi <-> Seluler) — hanya didukung Chrome/Android
+const _c = navigator.connection; if(_c && _c.addEventListener) _c.addEventListener("change",()=>{ updNet(true); kirimStatus(); });
 
 /* ---------- Baterai (Chrome/Android; tidak didukung iOS) ---------- */
 if(navigator.getBattery){
   navigator.getBattery().then(b=>{
-    let warned=false;
+    bat=b; let warned=false;
     const upd=()=>{ const p=Math.round(b.level*100);
       $("batv").textContent=p+"% "+(b.charging?"⚡":""); const bar=$("batbar");
       bar.style.width=p+"%"; bar.style.background=p<=20?"var(--bad)":p<=50?"#f59e0b":"var(--ok)";
       if(p<=20&&!b.charging&&!warned){warned=true;notify("Baterai Rendah","Tersisa "+p+"%");} if(p>20||b.charging) warned=false; };
     upd(); b.onlevelchange=upd; b.onchargingchange=upd;
+    kirimStatus();
   });
 } else { $("batv").textContent="N/A"; $("batv").style.fontSize="14px"; }
 
