@@ -85,13 +85,6 @@ select option{color:#111}
 @keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
 .lock{font-size:34px;line-height:1;margin-bottom:6px;display:inline-block;animation:float 2.4s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--bd);color:var(--mut);transition:background .35s,color .35s;animation:pop .5s cubic-bezier(.2,1.3,.4,1) both}
-.chip i{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
-.chip.ok{background:var(--okbg);color:var(--ok)}.chip.ok i{animation:pulse 1.8s infinite}
-.chip.bad{background:var(--badbg);color:var(--bad)}
-.chip.load{background:rgba(79,70,229,.12);color:var(--pri)}.chip.load i{animation:blink .5s infinite alternate}
-@keyframes pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -116,11 +109,6 @@ select option{color:#111}
     </div>
     <div id="sync" class="sync"><i></i><span id="synctxt">Pengiriman status belum aktif</span></div>
     <div id="cd" class="cd"><div></div></div>
-    <div class="chips">
-      <span id="chWake" class="chip"><i></i><span>Layar: -</span></span>
-      <span id="chRt" class="chip load"><i></i><span>Realtime: menyambung…</span></span>
-      <span id="chBg" class="chip"><i></i><span>Sync latar: -</span></span>
-    </div>
   </div>
 
   <div class="card">
@@ -146,7 +134,7 @@ select option{color:#111}
 const SUPABASE_URL = 'https://vxsopsnopeurnxdkfsbe.supabase.co'; 
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4c29wc25vcGV1cm54ZGtmc2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1NzM4MjgsImV4cCI6MjEwOTE0OTgyOH0.53GRhBd5Pvjjcqbh4M9ok7HKfqJs7klyxPqomXMEzus'; 
 // Kunci PUBLIK VAPID untuk Web Push (isi setelah menjalankan: npx web-push generate-vapid-keys)
-const VAPID_PUBLIC_KEY = 'ISI_VAPID_PUBLIC_KEY_DI_SINI';
+const VAPID_PUBLIC_KEY = 'BIPI_SPnl26l3peYek3V1SqvZVEmzrr9sg5m5sZLVWAXndXBkXNlEwktZ7pduc3lzxwx9dbeQ19UAUosJXuDIAA';
 const INTERVAL_KIRIM = 10000; // 10 detik
 // ==================================================================================
 // PASSWORD "PERBARUI KONEKSI"
@@ -179,7 +167,6 @@ function setSync(state, txt){
   $("cd").classList.toggle("run", state==="ok"||state==="send");
 }
 const jam = () => new Date().toLocaleTimeString("id-ID",{hour12:false});
-function setChip(id,state,txt){ const e=$(id); if(!e) return; e.className="chip "+state; e.lastChild.textContent=txt; }
 
 /* ---------- IndexedDB kecil (dibaca juga oleh sw-sync.js untuk Background Sync) ---------- */
 function idbOpen(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tablet-sync",1); r.onupgradeneeded=()=>r.result.createObjectStore("kv"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
@@ -264,7 +251,7 @@ async function antrekanSync(n){
   try{
     await idbSet("pending",{baterai:bat?Math.round(bat.level*100):null,nama:n.nama,t:Date.now()});
     const reg = await navigator.serviceWorker.ready;
-    if("sync" in reg){ await reg.sync.register("sync-status"); setChip("chBg","load","Sync latar: status diantre"); }
+    if("sync" in reg){ await reg.sync.register("sync-status"); }
   }catch(e){}
 }
 async function kirimStatus(){
@@ -294,20 +281,19 @@ buatTicker(kirimStatus, INTERVAL_KIRIM);
 /* ---------- Jaga layar tetap menyala agar pengiriman 10 detik tidak terhenti ---------- */
 let wl = null;
 async function jagaLayar(){
-  if(!("wakeLock" in navigator)) return setChip("chWake","bad","Layar: tidak didukung");
+  if(!("wakeLock" in navigator)) return;
   try{
     if(connected && document.visibilityState==="visible" && !wl){
       const l = await navigator.wakeLock.request("screen"); wl = l;
-      setChip("chWake","ok","Layar: tetap menyala");
       l.addEventListener("release",()=>{
         if(wl!==l) return;            // dilepas manual, abaikan
-        wl=null; setChip("chWake","load","Layar: menunggu aktif lagi");
+        wl=null;
         if(document.visibilityState==="visible") setTimeout(jagaLayar,500);
       });
     }
-  }catch(e){ wl=null; setChip("chWake","bad","Layar: ditolak sistem (cek mode hemat daya)"); }
+  }catch(e){ wl=null; }
 }
-function lepasLayar(){ const l=wl; wl=null; if(l) l.release().catch(()=>{}); setChip("chWake","","Layar: -"); }
+function lepasLayar(){ const l=wl; wl=null; if(l) l.release().catch(()=>{}); }
 // Wake Lock otomatis dilepas browser saat aplikasi di-minimize; diminta ulang begitu aplikasi terlihat lagi
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ jagaLayar(); kirimStatus(); if(!rtOk) jadwalRealtime(true); } });
 document.addEventListener("click",()=>{ if(connected && !wl) jagaLayar(); });
@@ -387,10 +373,9 @@ function mulaiRealtime(){
       if(ch!==rt) return; // abaikan event dari channel lama
       if(st==="SUBSCRIBED"){
         const pulih = rtTry>0; rtOk=true; rtTry=0;
-        setChip("chRt","ok","Realtime: tersambung");
         if(pulih){ checkStatus(); toast("Realtime tersambung kembali"); }
       } else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT"||st==="CLOSED"){
-        rtOk=false; setChip("chRt","bad","Realtime: terputus"); jadwalRealtime();
+        rtOk=false; jadwalRealtime();
       }
     });
   rt = ch;
@@ -398,7 +383,6 @@ function mulaiRealtime(){
 function jadwalRealtime(segera){
   if(rtTimer){ if(!segera) return; clearTimeout(rtTimer); }
   const d = segera ? 0 : Math.min(30000, 1000*Math.pow(2,rtTry++));
-  setChip("chRt","load","Realtime: menyambung ulang…");
   rtTimer = setTimeout(async()=>{
     rtTimer=null; const lama=rt; rt=null;
     try{ if(lama) await db.removeChannel(lama); }catch(e){}
@@ -409,7 +393,7 @@ mulaiRealtime();
 // Watchdog: periksa kesehatan koneksi tiap 20 detik
 buatTicker(()=>{ if(!rtTimer && navigator.onLine && (!rt || (rt.state!=="joined" && rt.state!=="joining"))) jadwalRealtime(true); }, 20000);
 addEventListener("online",()=>{ if(!rtOk) jadwalRealtime(true); kirimStatus(); });
-addEventListener("offline",()=>{ rtOk=false; setChip("chRt","bad","Realtime: offline"); });
+addEventListener("offline",()=>{ rtOk=false; });
 
 /* ---------- Online / Offline ---------- */
 function updNet(first){
@@ -442,11 +426,10 @@ async function siapBackground(){
     if(!("serviceWorker" in navigator)) return;
     const reg = await navigator.serviceWorker.ready;
     if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
-    setChip("chBg", "sync" in reg ? "ok" : "bad", "sync" in reg ? "Sync latar: siaga" : "Sync latar: tidak didukung");
     if("periodicSync" in reg){
       try{
         const st = await navigator.permissions.query({name:"periodic-background-sync"});
-        if(st.state==="granted"){ await reg.periodicSync.register("status-berkala",{minInterval:15*60*1000}); setChip("chBg","ok","Sync latar: siaga + berkala"); }
+        if(st.state==="granted"){ await reg.periodicSync.register("status-berkala",{minInterval:15*60*1000}); }
       }catch(e){}
     }
   }catch(e){}
@@ -454,7 +437,7 @@ async function siapBackground(){
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("/sw.js");
   navigator.serviceWorker.addEventListener("message",e=>{
-    if(e.data && e.data.type==="sync-ok"){ setSync("ok","Status terkirim via sinkron latar "+jam()); setChip("chBg","ok","Sync latar: terkirim "+jam()); }
+    if(e.data && e.data.type==="sync-ok"){ setSync("ok","Status terkirim via sinkron latar "+jam()); }
   });
 }
 loadTablets();
