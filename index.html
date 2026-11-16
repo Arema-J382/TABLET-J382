@@ -85,6 +85,13 @@ select option{color:#111}
 @keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
 .lock{font-size:34px;line-height:1;margin-bottom:6px;display:inline-block;animation:float 2.4s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--bd);color:var(--mut);transition:background .35s,color .35s;animation:pop .5s cubic-bezier(.2,1.3,.4,1) both}
+.chip i{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.ok i{animation:pulse 1.8s infinite}
+.chip.bad{background:var(--badbg);color:var(--bad)}
+.chip.load{background:rgba(79,70,229,.12);color:var(--pri)}.chip.load i{animation:blink .5s infinite alternate}
+@keyframes pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -109,6 +116,11 @@ select option{color:#111}
     </div>
     <div id="sync" class="sync"><i></i><span id="synctxt">Pengiriman status belum aktif</span></div>
     <div id="cd" class="cd"><div></div></div>
+    <div class="chips">
+      <span id="chWake" class="chip"><i></i><span>Layar: -</span></span>
+      <span id="chRt" class="chip load"><i></i><span>Realtime: menyambung…</span></span>
+      <span id="chBg" class="chip"><i></i><span>Sync latar: -</span></span>
+    </div>
   </div>
 
   <div class="card">
@@ -167,6 +179,20 @@ function setSync(state, txt){
   $("cd").classList.toggle("run", state==="ok"||state==="send");
 }
 const jam = () => new Date().toLocaleTimeString("id-ID",{hour12:false});
+function setChip(id,state,txt){ const e=$(id); if(!e) return; e.className="chip "+state; e.lastChild.textContent=txt; }
+
+/* ---------- IndexedDB kecil (dibaca juga oleh sw-sync.js untuk Background Sync) ---------- */
+function idbOpen(){ return new Promise((res,rej)=>{ const r=indexedDB.open("tablet-sync",1); r.onupgradeneeded=()=>r.result.createObjectStore("kv"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbSet(k,v){ try{ const d=await idbOpen(); await new Promise((res,rej)=>{ const t=d.transaction("kv","readwrite"); t.objectStore("kv").put(v,k); t.oncomplete=res; t.onerror=()=>rej(t.error); }); d.close(); }catch(e){} }
+async function idbDel(k){ try{ const d=await idbOpen(); await new Promise((res,rej)=>{ const t=d.transaction("kv","readwrite"); t.objectStore("kv").delete(k); t.oncomplete=res; t.onerror=()=>rej(t.error); }); d.close(); }catch(e){} }
+
+/* ---------- Timer tahan throttling: Web Worker (fallback setInterval) ---------- */
+function buatTicker(fn,ms){
+  try{
+    const w=new Worker(URL.createObjectURL(new Blob(["setInterval(function(){postMessage(1)},"+ms+")"],{type:"text/javascript"})));
+    w.onmessage=fn; return w;
+  }catch(e){ return setInterval(fn,ms); }
+}
 
 /* ---------- Suara & notifikasi ---------- */
 let ac;
@@ -233,12 +259,21 @@ function getNet(){
 }
 
 /* ---------- Kirim status baterai & internet ke Supabase tiap 10 detik ---------- */
+// Antrekan status ke IndexedDB + daftarkan Background Sync (dikirim service worker saat internet kembali, meski aplikasi di-minimize/ditutup)
+async function antrekanSync(n){
+  try{
+    await idbSet("pending",{baterai:bat?Math.round(bat.level*100):null,nama:n.nama,t:Date.now()});
+    const reg = await navigator.serviceWorker.ready;
+    if("sync" in reg){ await reg.sync.register("sync-status"); setChip("chBg","load","Sync latar: status diantre"); }
+  }catch(e){}
+}
 async function kirimStatus(){
   if(!sel || !connected || sending) return;
   if(ownerKode && ownerKode!==kode) return setSync("bad","Tablet ini terhubung ke perangkat lain");
-  if(!navigator.onLine) return setSync("bad","Offline — menunggu jaringan…");
-  sending = true; setSync("send","Mengirim status…");
   const n = getNet();
+  idbSet("last",{baterai:bat?Math.round(bat.level*100):null,nama:n.nama}); // dipakai sinkron berkala di latar belakang
+  if(!navigator.onLine){ antrekanSync(n); return setSync("bad","Offline — status diantre, terkirim otomatis saat online"); }
+  sending = true; setSync("send","Mengirim status…");
   const payload = {
     status_internet: n.on ? "ONLINE"+(n.nama?" - "+n.nama:"") : "OFFLINE",
     terakhir_update: new Date().toISOString()
@@ -246,22 +281,36 @@ async function kirimStatus(){
   if(bat) payload.status_baterai = Math.round(bat.level*100);
   const {data,error} = await db.from("koneksi_tablet").update(payload).eq("nama_tab_sts",sel).eq("kode_sts",kode).select("id");
   sending = false;
-  if(error) return setSync("bad","Gagal kirim: "+error.message);
+  if(error){
+    if(!navigator.onLine || /fetch|network|load failed|timeout/i.test(error.message||"")) antrekanSync(n);
+    return setSync("bad","Gagal kirim: "+error.message);
+  }
   if(!data || !data.length) return setSync("bad","Data koneksi tablet tidak ditemukan");
+  idbDel("pending");
   setSync("ok","Status terkirim "+jam()+" · otomatis tiap 10 detik");
 }
-setInterval(kirimStatus, INTERVAL_KIRIM);
+buatTicker(kirimStatus, INTERVAL_KIRIM);
 
 /* ---------- Jaga layar tetap menyala agar pengiriman 10 detik tidak terhenti ---------- */
 let wl = null;
 async function jagaLayar(){
+  if(!("wakeLock" in navigator)) return setChip("chWake","bad","Layar: tidak didukung");
   try{
-    if("wakeLock" in navigator && connected && document.visibilityState==="visible" && !wl){
-      wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release",()=>{ wl=null; });
+    if(connected && document.visibilityState==="visible" && !wl){
+      const l = await navigator.wakeLock.request("screen"); wl = l;
+      setChip("chWake","ok","Layar: tetap menyala");
+      l.addEventListener("release",()=>{
+        if(wl!==l) return;            // dilepas manual, abaikan
+        wl=null; setChip("chWake","load","Layar: menunggu aktif lagi");
+        if(document.visibilityState==="visible") setTimeout(jagaLayar,500);
+      });
     }
-  }catch(e){}
+  }catch(e){ wl=null; setChip("chWake","bad","Layar: ditolak sistem (cek mode hemat daya)"); }
 }
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ jagaLayar(); kirimStatus(); } });
+function lepasLayar(){ const l=wl; wl=null; if(l) l.release().catch(()=>{}); setChip("chWake","","Layar: -"); }
+// Wake Lock otomatis dilepas browser saat aplikasi di-minimize; diminta ulang begitu aplikasi terlihat lagi
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ jagaLayar(); kirimStatus(); if(!rtOk) jadwalRealtime(true); } });
+document.addEventListener("click",()=>{ if(connected && !wl) jagaLayar(); });
 
 /* ---------- Data Supabase ---------- */
 async function loadTablets(){
@@ -279,7 +328,7 @@ async function checkStatus(){
   const {data,error} = await db.from("koneksi_tablet").select("id,kode_sts").eq("nama_tab_sts",sel).limit(1);
   if(error){ setBadge("none"); return toast("Gagal cek: "+error.message); }
   connected = data.length>0; ownerKode = connected ? data[0].kode_sts : null; setBadge(connected?"ok":"bad");
-  if(connected){ kirimStatus(); jagaLayar(); } else setSync("","Hubungkan tablet untuk mulai mengirim status");
+  if(connected){ kirimStatus(); jagaLayar(); simpanKonfigSW(); siapBackground(); } else { setSync("","Hubungkan tablet untuk mulai mengirim status"); lepasLayar(); }
 }
 $("tab").onchange = e=>{ sel=e.target.value; localStorage.setItem("tab_dipilih",sel); checkStatus(); daftarPush(); };
 
@@ -319,7 +368,7 @@ $("eye").onclick = ()=>{ const t=$("pw").type==="password"; $("pw").type=t?"text
 document.addEventListener("keydown",e=>{ if(e.key==="Escape" && $("ov").classList.contains("show")) tutupModal(); });
 
 /* ---------- Realtime: notifikasi + suara saat data koneksi berubah ---------- */
-db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"koneksi_tablet"},p=>{
+function onRealtime(p){
   const n = p.new && p.new.nama_tab_sts;
   // Abaikan update rutin (status baterai/internet) dari tablet pemilik koneksi, supaya tidak berbunyi tiap 10 detik
   if(p.eventType==="UPDATE" && n===sel && connected && p.new.kode_sts===ownerKode) return;
@@ -327,7 +376,40 @@ db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"ko
   // Alarm hanya untuk tablet yang namanya (nama_tab_sts) dipilih DAN kodenya (kode_sts) terdaftar di tablet ini
   const milikSaya = sel && connected && ownerKode===kode;
   if(!n || n===sel){ checkStatus(); if(milikSaya) notify("Info Koneksi", n ? "Data "+n+" berubah" : "Ada koneksi dihapus"); }
-}).subscribe();
+}
+
+/* ---------- Auto-reconnect Realtime (WebSocket Supabase) dengan backoff eksponensial ---------- */
+let rt=null, rtOk=false, rtTry=0, rtTimer=null;
+function mulaiRealtime(){
+  let ch;
+  ch = db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"koneksi_tablet"},onRealtime)
+    .subscribe(st=>{
+      if(ch!==rt) return; // abaikan event dari channel lama
+      if(st==="SUBSCRIBED"){
+        const pulih = rtTry>0; rtOk=true; rtTry=0;
+        setChip("chRt","ok","Realtime: tersambung");
+        if(pulih){ checkStatus(); toast("Realtime tersambung kembali"); }
+      } else if(st==="CHANNEL_ERROR"||st==="TIMED_OUT"||st==="CLOSED"){
+        rtOk=false; setChip("chRt","bad","Realtime: terputus"); jadwalRealtime();
+      }
+    });
+  rt = ch;
+}
+function jadwalRealtime(segera){
+  if(rtTimer){ if(!segera) return; clearTimeout(rtTimer); }
+  const d = segera ? 0 : Math.min(30000, 1000*Math.pow(2,rtTry++));
+  setChip("chRt","load","Realtime: menyambung ulang…");
+  rtTimer = setTimeout(async()=>{
+    rtTimer=null; const lama=rt; rt=null;
+    try{ if(lama) await db.removeChannel(lama); }catch(e){}
+    mulaiRealtime();
+  }, d);
+}
+mulaiRealtime();
+// Watchdog: periksa kesehatan koneksi tiap 20 detik
+buatTicker(()=>{ if(!rtTimer && navigator.onLine && (!rt || (rt.state!=="joined" && rt.state!=="joining"))) jadwalRealtime(true); }, 20000);
+addEventListener("online",()=>{ if(!rtOk) jadwalRealtime(true); kirimStatus(); });
+addEventListener("offline",()=>{ rtOk=false; setChip("chRt","bad","Realtime: offline"); });
 
 /* ---------- Online / Offline ---------- */
 function updNet(first){
@@ -353,7 +435,28 @@ if(navigator.getBattery){
 } else { $("batv").textContent="N/A"; $("batv").style.fontSize="14px"; }
 
 /* ---------- Init ---------- */
-if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+/* ---------- Background Sync & Periodic Sync ---------- */
+function simpanKonfigSW(){ if(sel && connected && ownerKode===kode) idbSet("config",{url:SUPABASE_URL,key:SUPABASE_ANON_KEY,nama:sel,kode}); }
+async function siapBackground(){
+  try{
+    if(!("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.ready;
+    if(navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    setChip("chBg", "sync" in reg ? "ok" : "bad", "sync" in reg ? "Sync latar: siaga" : "Sync latar: tidak didukung");
+    if("periodicSync" in reg){
+      try{
+        const st = await navigator.permissions.query({name:"periodic-background-sync"});
+        if(st.state==="granted"){ await reg.periodicSync.register("status-berkala",{minInterval:15*60*1000}); setChip("chBg","ok","Sync latar: siaga + berkala"); }
+      }catch(e){}
+    }
+  }catch(e){}
+}
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("/sw.js");
+  navigator.serviceWorker.addEventListener("message",e=>{
+    if(e.data && e.data.type==="sync-ok"){ setSync("ok","Status terkirim via sinkron latar "+jam()); setChip("chBg","ok","Sync latar: terkirim "+jam()); }
+  });
+}
 loadTablets();
 </script>
 </body>
