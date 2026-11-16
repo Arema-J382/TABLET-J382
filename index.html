@@ -85,6 +85,12 @@ select option{color:#111}
 @keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-7px)}40%,60%{transform:translateX(7px)}}
 .lock{font-size:34px;line-height:1;margin-bottom:6px;display:inline-block;animation:float 2.4s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+/* indikator status Web Push */
+.pstat{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:12px;color:var(--mut);text-align:center;transition:color .3s}
+.pstat i{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none;transition:background .3s}
+.pstat.ok{color:var(--ok)}.pstat.ok i{background:var(--ok);animation:pulse 1.6s infinite}
+.pstat.bad{color:var(--bad)}.pstat.bad i{background:var(--bad)}
+#perm{transition:transform .15s,background .2s}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style>
 </head>
@@ -113,6 +119,7 @@ select option{color:#111}
 
   <div class="card">
     <button id="perm" class="btn ghost">🔔 Aktifkan Notifikasi &amp; Suara</button>
+    <div id="pstat" class="pstat"><i></i><span>Status push belum dicek</span></div>
   </div>
 </div>
 
@@ -214,15 +221,27 @@ async function notify(title, body){
 
 /* ---------- Web Push (agar notifikasi + suara tetap muncul saat PWA ditutup) ---------- */
 function urlB64(s){ const p="=".repeat((4-s.length%4)%4), b=(s+p).replace(/-/g,"+").replace(/_/g,"/"), r=atob(b); return Uint8Array.from([...r].map(c=>c.charCodeAt(0))); }
+let pushBusy=false;
+function setPush(state,txt){ const e=$("pstat"); e.className="pstat "+state; e.querySelector("span").textContent=txt; }
+function samaKey(a,b){ a=new Uint8Array(a); if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
 async function daftarPush(){
+  if(pushBusy) return; pushBusy=true;
   try{
-    if(!sel || !("PushManager" in window) || !VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith("ISI_")) return;
-    if(Notification.permission!=="granted") return;
+    if(!("PushManager" in window)) return setPush("bad","Browser tidak mendukung Web Push");
+    if(!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.startsWith("ISI_")) return setPush("bad","Kunci VAPID belum diisi");
+    if(Notification.permission!=="granted") return setPush("bad","Izin notifikasi belum aktif");
+    if(!sel) return setPush("","Pilih tablet untuk mengaktifkan push");
     const reg = await navigator.serviceWorker.ready;
+    const key = urlB64(VAPID_PUBLIC_KEY);
     let s = await reg.pushManager.getSubscription();
-    if(!s) s = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64(VAPID_PUBLIC_KEY)});
-    await db.rpc("simpan_push",{p_kode:kode, p_nama:sel, p_sub:s.toJSON()});
-  }catch(e){ console.warn("Push gagal:",e); }
+    // langganan lama yang dibuat dengan kunci VAPID berbeda tidak akan pernah menerima push -> buat ulang
+    if(s && s.options && s.options.applicationServerKey && !samaKey(s.options.applicationServerKey,key)){ await s.unsubscribe(); s=null; }
+    if(!s) s = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:key});
+    const {error} = await db.rpc("simpan_push",{p_kode:kode, p_nama:sel, p_sub:s.toJSON()});
+    if(error) throw error;
+    setPush("ok","Push latar belakang aktif — notifikasi tetap masuk saat tablet idle/tidur");
+  }catch(e){ console.warn("Push gagal:",e); setPush("bad","Push gagal: "+(e.message||e)); }
+  finally{ pushBusy=false; }
 }
 $("perm").onclick = async()=>{
   if(!("Notification" in window)){ unlockAudio(); playSound(); return toast("Browser belum mendukung notifikasi. Di iOS, install dulu ke Layar Utama."); }
@@ -295,7 +314,7 @@ async function jagaLayar(){
 }
 function lepasLayar(){ const l=wl; wl=null; if(l) l.release().catch(()=>{}); }
 // Wake Lock otomatis dilepas browser saat aplikasi di-minimize; diminta ulang begitu aplikasi terlihat lagi
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ jagaLayar(); kirimStatus(); if(!rtOk) jadwalRealtime(true); } });
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"){ jagaLayar(); kirimStatus(); daftarPush(); if(!rtOk) jadwalRealtime(true); } });
 document.addEventListener("click",()=>{ if(connected && !wl) jagaLayar(); });
 
 /* ---------- Data Supabase ---------- */
@@ -437,10 +456,16 @@ async function siapBackground(){
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("/sw.js");
   navigator.serviceWorker.addEventListener("message",e=>{
-    if(e.data && e.data.type==="sync-ok"){ setSync("ok","Status terkirim via sinkron latar "+jam()); }
+    if(!e.data) return;
+    if(e.data.type==="sync-ok"){ setSync("ok","Status terkirim via sinkron latar "+jam()); }
+    // push masuk saat aplikasi terbuka -> bunyikan alarm keras dalam aplikasi
+    if(e.data.type==="push-in" && document.visibilityState==="visible") playSound();
+    // langganan push berubah di browser -> daftarkan ulang
+    if(e.data.type==="resub") daftarPush();
   });
 }
 loadTablets();
+addEventListener("load",()=>setTimeout(daftarPush,1500));
 </script>
 </body>
 </html>
