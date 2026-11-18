@@ -20,6 +20,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(
 .card{background:var(--card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--bd);border-radius:22px;padding:20px;box-shadow:0 10px 30px rgba(79,70,229,.12);animation:up .6s cubic-bezier(.2,.8,.2,1) both;transition:transform .3s,box-shadow .3s}
 .card:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(79,70,229,.18)}
 .card:nth-child(2){animation-delay:.1s}.card:nth-child(3){animation-delay:.2s}
+.card{position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--pri),var(--pri2),var(--pri));background-size:200% 100%;animation:flow 5s linear infinite;opacity:.85}
+@keyframes flow{to{background-position:200% 0}}
+.ico{display:inline-block;margin-right:6px;animation:float 2.8s ease-in-out infinite;-webkit-text-fill-color:initial}
 @keyframes up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 h1{margin:0 0 2px;font-size:22px;background:linear-gradient(90deg,var(--pri),var(--pri2));-webkit-background-clip:text;background-clip:text;color:transparent}
 .sub{margin:0 0 18px;color:var(--mut);font-size:13px}
@@ -27,6 +31,7 @@ label{font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;l
 .row{display:flex;gap:10px;align-items:center;margin-top:8px}
 select{flex:1;min-width:0;padding:13px 12px;border-radius:14px;border:1.5px solid var(--bd);background:transparent;color:var(--txt);font-size:15px;outline:none;transition:.2s}
 select:hover{border-color:var(--pri)}
+select{cursor:pointer}
 select:focus{border-color:var(--pri);box-shadow:0 0 0 4px rgba(79,70,229,.15)}
 select option{color:#111}
 .badge{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border-radius:999px;font-size:12.5px;font-weight:700;white-space:nowrap;transition:.35s;background:var(--bd);color:var(--mut)}
@@ -40,17 +45,19 @@ select option{color:#111}
 .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 12px 26px rgba(79,70,229,.42)}
 .btn:not(.ghost):not(:disabled)::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:shine 3.2s ease-in-out infinite}
 @keyframes shine{0%,60%{left:-60%}100%{left:130%}}
-.btn:active{transform:scale(.97)}.btn:disabled{opacity:.5;box-shadow:none;cursor:not-allowed}
+.btn:active{transform:scale(.96)}.btn:disabled{opacity:.5;box-shadow:none;cursor:not-allowed}
 .btn.ghost{background:transparent;color:var(--pri);border:1.5px solid var(--pri);box-shadow:none;margin-top:0;padding:11px;font-size:14px}
 .btn.ghost:hover:not(:disabled){background:rgba(79,70,229,.08);box-shadow:none}
 .btn:focus-visible,select:focus-visible{outline:3px solid rgba(124,58,237,.45);outline-offset:2px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .mini{border:1px solid var(--bd);border-radius:16px;padding:14px;transition:.3s}
-.mini:hover{border-color:var(--pri)}
+.mini:hover{border-color:var(--pri);transform:translateY(-2px)}
+.mini{animation:up .6s cubic-bezier(.2,.8,.2,1) both}.mini:nth-child(2){animation-delay:.12s}
 .mini small{color:var(--mut);font-size:12px}.mini b{display:block;font-size:20px;margin-top:4px}
 .mini .nm{display:block;margin-top:4px;font-size:11.5px;color:var(--mut);min-height:14px;word-break:break-word}
 .bat{height:8px;border-radius:9px;background:var(--bd);overflow:hidden;margin-top:8px}
-.bat div{height:100%;width:0;border-radius:9px;background:var(--ok);transition:width .6s,background .3s}
+.bat div{height:100%;width:0;border-radius:9px;background:var(--ok);transition:width .6s,background .3s;background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);background-size:60% 100%;background-repeat:no-repeat;animation:batshine 2.6s ease-in-out infinite}
+@keyframes batshine{from{background-position:-100% 0}to{background-position:220% 0}}
 .code{font:12px ui-monospace,monospace;color:var(--mut);text-align:center;margin-top:12px;word-break:break-all}
 /* indikator sinkron 10 detik */
 .sync{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--mut);justify-content:center;text-align:center}
@@ -61,12 +68,12 @@ select option{color:#111}
 @keyframes blink{from{opacity:.3}to{opacity:1}}
 .cd{height:3px;border-radius:9px;background:var(--bd);overflow:hidden;margin-top:8px}
 .cd div{height:100%;width:0;background:linear-gradient(90deg,var(--pri),var(--pri2));border-radius:9px}
-.cd.run div{animation:cdown 10s linear infinite}
+.cd.run div{animation:cdown var(--hb,60s) linear infinite}
 @keyframes cdown{from{width:0}to{width:100%}}
 .ov{position:fixed;inset:0;background:rgba(15,16,36,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:.25s;z-index:10}
 .ov.show{opacity:1;pointer-events:auto}
-.modal{background:var(--bg1);color:var(--txt);border-radius:22px;padding:24px;max-width:340px;width:100%;text-align:center;transform:scale(.88);transition:.3s cubic-bezier(.2,1.3,.4,1)}
-.ov.show .modal{transform:scale(1)}
+.modal{background:var(--bg1);color:var(--txt);border-radius:22px;padding:24px;max-width:340px;width:100%;text-align:center;transform:scale(.88) translateY(14px);transition:.3s cubic-bezier(.2,1.3,.4,1);box-shadow:0 24px 60px rgba(0,0,0,.35);border:1px solid var(--bd)}
+.ov.show .modal{transform:none}
 .modal h3{margin:0 0 8px}.modal p{margin:0 0 18px;color:var(--mut);font-size:14px}
 .modal .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modal .btn{margin:0;padding:12px;font-size:15px}
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translate(-50%,-120px);background:var(--txt);color:var(--bg1);padding:12px 18px;border-radius:14px;font-size:14px;font-weight:600;transition:.4s cubic-bezier(.2,1.2,.4,1);z-index:20;max-width:90%;text-align:center;box-shadow:0 10px 26px rgba(0,0,0,.25)}
@@ -97,7 +104,7 @@ select option{color:#111}
 <body>
 <div class="wrap">
   <div class="card">
-    <h1>Koneksi Tablet</h1>
+    <h1><span class="ico">📱</span>Koneksi Tablet</h1>
     <p class="sub">Pilih tablet lalu hubungkan perangkat ini.</p>
     <label for="tab">Nama Tablet</label>
     <div class="row">
@@ -142,7 +149,18 @@ const SUPABASE_URL = 'https://vxsopsnopeurnxdkfsbe.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4c29wc25vcGV1cm54ZGtmc2JlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1NzM4MjgsImV4cCI6MjEwOTE0OTgyOH0.53GRhBd5Pvjjcqbh4M9ok7HKfqJs7klyxPqomXMEzus'; 
 // Kunci PUBLIK VAPID untuk Web Push (isi setelah menjalankan: npx web-push generate-vapid-keys)
 const VAPID_PUBLIC_KEY = 'BIPI_SPnl26l3peYek3V1SqvZVEmzrr9sg5m5sZLVWAXndXBkXNlEwktZ7pduc3lzxwx9dbeQ19UAUosJXuDIAA';
-const INTERVAL_KIRIM = 10000; // 10 detik
+// ---- PENGHEMATAN LOG INGESTION & EGRESS SUPABASE ----
+// Pengecekan perubahan dilakukan LOKAL tiap 10 detik (tidak memakai internet/Supabase).
+// Data baru dikirim ke Supabase HANYA jika: (a) baterai/jaringan berubah, atau (b) sudah waktunya heartbeat.
+// Jika dashboard/admin Anda menganggap tablet "mati" setelah X detik tanpa update,
+// pastikan X lebih besar dari 2-3 kali HEARTBEAT (default: 60 dtk -> batas offline minimal 180 dtk).
+const INTERVAL_CEK = 10000;      // cek lokal tiap 10 detik (gratis)
+const HEARTBEAT    = 60000;      // kirim wajib tiap 60 detik walau tidak ada perubahan
+const JEDA_MIN     = 10000;      // jarak minimal antar pengiriman saat ada perubahan
+const JEDA_GAGAL   = 30000;      // jeda sebelum mencoba lagi bila pengiriman gagal
+const TTL_DAFTAR   = 30*60*1000; // daftar tablet di-cache 30 menit
+const TTL_PUSH     = 24*60*60*1000; // pendaftaran push tidak diulang selama 24 jam bila tidak berubah
+document.documentElement.style.setProperty("--hb", (HEARTBEAT/1000)+"s");
 // ==================================================================================
 // PASSWORD "PERBARUI KONEKSI"
 // Ubah password di sini jika ingin menggantinya di kemudian hari (cukup ganti teks
@@ -171,7 +189,8 @@ function setBadge(state){
 }
 function setSync(state, txt){
   $("sync").className = "sync " + state; $("synctxt").textContent = txt;
-  $("cd").classList.toggle("run", state==="ok"||state==="send");
+  const cd=$("cd"); cd.classList.toggle("run", state==="ok"||state==="send");
+  if(state==="ok"){ cd.classList.remove("run"); void cd.offsetWidth; cd.classList.add("run"); }
 }
 const jam = () => new Date().toLocaleTimeString("id-ID",{hour12:false});
 
@@ -224,7 +243,7 @@ function urlB64(s){ const p="=".repeat((4-s.length%4)%4), b=(s+p).replace(/-/g,"
 let pushBusy=false;
 function setPush(state,txt){ const e=$("pstat"); e.className="pstat "+state; e.querySelector("span").textContent=txt; }
 function samaKey(a,b){ a=new Uint8Array(a); if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
-async function daftarPush(){
+async function daftarPush(paksa){
   if(pushBusy) return; pushBusy=true;
   try{
     if(!("PushManager" in window)) return setPush("bad","Browser tidak mendukung Web Push");
@@ -237,8 +256,15 @@ async function daftarPush(){
     // langganan lama yang dibuat dengan kunci VAPID berbeda tidak akan pernah menerima push -> buat ulang
     if(s && s.options && s.options.applicationServerKey && !samaKey(s.options.applicationServerKey,key)){ await s.unsubscribe(); s=null; }
     if(!s) s = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:key});
+    // Hemat request: jangan daftar ulang ke Supabase bila endpoint, tablet, dan kode sama dalam 24 jam terakhir
+    const kunci = (s.endpoint||"")+"|"+sel+"|"+kode;
+    let cache=null; try{ cache=JSON.parse(localStorage.getItem("push_reg")||"null"); }catch(e){}
+    if(!paksa && cache && cache.k===kunci && Date.now()-cache.t<TTL_PUSH){
+      return setPush("ok","Push latar belakang aktif — notifikasi tetap masuk saat tablet idle/tidur");
+    }
     const {error} = await db.rpc("simpan_push",{p_kode:kode, p_nama:sel, p_sub:s.toJSON()});
     if(error) throw error;
+    try{ localStorage.setItem("push_reg",JSON.stringify({k:kunci,t:Date.now()})); }catch(e){}
     setPush("ok","Push latar belakang aktif — notifikasi tetap masuk saat tablet idle/tidur");
   }catch(e){ console.warn("Push gagal:",e); setPush("bad","Push gagal: "+(e.message||e)); }
   finally{ pushBusy=false; }
@@ -273,11 +299,17 @@ async function antrekanSync(n){
     if("sync" in reg){ await reg.sync.register("sync-status"); }
   }catch(e){}
 }
+let lastSent={sig:"",t:0}, nextTry=0;
+const sigStatus = n => [n.on?1:0, n.nama, bat?Math.round(bat.level*100):"-"].join("|");
 async function kirimStatus(){
   if(!sel || !connected || sending) return;
   if(ownerKode && ownerKode!==kode) return setSync("bad","Tablet ini terhubung ke perangkat lain");
-  const n = getNet();
-  idbSet("last",{baterai:bat?Math.round(bat.level*100):null,nama:n.nama}); // dipakai sinkron berkala di latar belakang
+  const n = getNet(), s = sigStatus(n), now = Date.now();
+  const berubah = s!==lastSent.sig, jatuhTempo = now-lastSent.t >= HEARTBEAT;
+  if(!berubah && !jatuhTempo) return;                       // tidak ada yang perlu dikirim -> 0 request
+  if(berubah && !jatuhTempo && now-lastSent.t < JEDA_MIN) return; // batasi laju saat sering berubah
+  if(now < nextTry) return;                                 // jeda setelah gagal
+  if(berubah) idbSet("last",{baterai:bat?Math.round(bat.level*100):null,nama:n.nama}); // dipakai sinkron berkala di latar belakang
   if(!navigator.onLine){ antrekanSync(n); return setSync("bad","Offline — status diantre, terkirim otomatis saat online"); }
   sending = true; setSync("send","Mengirim status…");
   const payload = {
@@ -285,17 +317,20 @@ async function kirimStatus(){
     terakhir_update: new Date().toISOString()
   };
   if(bat) payload.status_baterai = Math.round(bat.level*100);
-  const {data,error} = await db.from("koneksi_tablet").update(payload).eq("nama_tab_sts",sel).eq("kode_sts",kode).select("id");
+  // Tanpa .select(): server tidak mengembalikan body; jumlah baris dibaca dari header (count)
+  const {error,count} = await db.from("koneksi_tablet").update(payload,{count:"exact"}).eq("nama_tab_sts",sel).eq("kode_sts",kode);
   sending = false;
   if(error){
+    nextTry = Date.now()+JEDA_GAGAL;
     if(!navigator.onLine || /fetch|network|load failed|timeout/i.test(error.message||"")) antrekanSync(n);
     return setSync("bad","Gagal kirim: "+error.message);
   }
-  if(!data || !data.length) return setSync("bad","Data koneksi tablet tidak ditemukan");
+  if(count===0){ nextTry = Date.now()+JEDA_GAGAL; return setSync("bad","Data koneksi tablet tidak ditemukan"); }
+  lastSent = {sig:s,t:Date.now()}; nextTry = 0;
   idbDel("pending");
-  setSync("ok","Status terkirim "+jam()+" · otomatis tiap 10 detik");
+  setSync("ok","Status terkirim "+jam()+" · hemat: kirim saat berubah / tiap "+(HEARTBEAT/1000)+" dtk");
 }
-buatTicker(kirimStatus, INTERVAL_KIRIM);
+buatTicker(()=>kirimStatus(), INTERVAL_CEK); // dibungkus agar event Worker tidak terbawa sebagai argumen
 
 /* ---------- Jaga layar tetap menyala agar pengiriman 10 detik tidak terhenti ---------- */
 let wl = null;
@@ -318,14 +353,29 @@ document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==
 document.addEventListener("click",()=>{ if(connected && !wl) jagaLayar(); });
 
 /* ---------- Data Supabase ---------- */
-async function loadTablets(){
-  const {data,error} = await db.from("data_tablet").select("nama_tab").order("nama_tab");
+function renderTablets(names, aktifkan){
   const s=$("tab");
-  if(error){ s.innerHTML='<option value="">Gagal memuat data</option>'; return toast("Gagal: "+error.message); }
+  s.innerHTML='<option value="">— Pilih tablet —</option>'+names.map(n=>`<option>${n}</option>`).join("");
+  if(names.includes(sel)){ s.value=sel; if(aktifkan){ checkStatus(); daftarPush(); } }
+  else if(aktifkan){ sel=""; ganti_realtime(); }
+}
+async function loadTablets(){
+  // Cache daftar tablet: tampil instan & hemat egress. Di-refresh ke Supabase tiap 30 menit.
+  let c=null; try{ c=JSON.parse(localStorage.getItem("daftar_tablet")||"null"); }catch(e){}
+  const adaCache = c && Array.isArray(c.n) && c.n.length;
+  if(adaCache){
+    if(Date.now()-c.t < TTL_DAFTAR) return renderTablets(c.n,true);
+    renderTablets(c.n,false);
+  }
+  const {data,error} = await db.from("data_tablet").select("nama_tab").order("nama_tab");
+  if(error){
+    if(adaCache) return renderTablets(c.n,true); // pakai cache lama bila gagal
+    $("tab").innerHTML='<option value="">Gagal memuat data</option>'; return toast("Gagal: "+error.message);
+  }
   const names=[...new Set(data.map(d=>d.nama_tab).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,"id",{numeric:true,sensitivity:"base"})); // urut natural: B-1, B-2, ... B-10
-  s.innerHTML='<option value="">— Pilih tablet —</option>'+names.map(n=>`<option>${n}</option>`).join("");
-  if(names.includes(sel)){ s.value=sel; checkStatus(); daftarPush(); } else sel="";
+  try{ localStorage.setItem("daftar_tablet",JSON.stringify({n:names,t:Date.now()})); }catch(e){}
+  renderTablets(names,true);
 }
 async function checkStatus(){
   if(!sel){ connected=false; ownerKode=null; setSync("","Pengiriman status belum aktif"); return setBadge("none"); }
@@ -335,7 +385,7 @@ async function checkStatus(){
   connected = data.length>0; ownerKode = connected ? data[0].kode_sts : null; setBadge(connected?"ok":"bad");
   if(connected){ kirimStatus(); jagaLayar(); simpanKonfigSW(); siapBackground(); } else { setSync("","Hubungkan tablet untuk mulai mengirim status"); lepasLayar(); }
 }
-$("tab").onchange = e=>{ sel=e.target.value; localStorage.setItem("tab_dipilih",sel); checkStatus(); daftarPush(); };
+$("tab").onchange = e=>{ sel=e.target.value; localStorage.setItem("tab_dipilih",sel); lastSent={sig:"",t:0}; nextTry=0; ganti_realtime(); checkStatus(); daftarPush(); };
 
 async function simpan(){
   if(busy) return; busy=true; $("btn").disabled=true;
@@ -347,7 +397,8 @@ async function simpan(){
   }
   busy=false;
   if(error){ toast("Gagal: "+error.message); return checkStatus(); }
-  await checkStatus(); daftarPush(); notify("Berhasil","Koneksi "+sel+" tersimpan");
+  lastSent={sig:"",t:0}; nextTry=0;
+  await checkStatus(); daftarPush(true); notify("Berhasil","Koneksi "+sel+" tersimpan");
 }
 function bukaModal(){
   $("pw").value=""; $("pw").type="password"; $("eye").textContent="👁";
@@ -385,9 +436,17 @@ function onRealtime(p){
 
 /* ---------- Auto-reconnect Realtime (WebSocket Supabase) dengan backoff eksponensial ---------- */
 let rt=null, rtOk=false, rtTry=0, rtTimer=null;
+// Hemat egress Realtime: tiap tablet HANYA menerima perubahan baris tablet yang dipilihnya (filter di sisi server).
+// DELETE tidak mendukung filter di Supabase, jadi didengarkan terpisah (jarang terjadi).
 function mulaiRealtime(){
-  let ch;
-  ch = db.channel("koneksi").on("postgres_changes",{event:"*",schema:"public",table:"koneksi_tablet"},onRealtime)
+  const f = (sel && !/[,()]/.test(sel)) ? "nama_tab_sts=eq."+sel : null;
+  const base = {schema:"public",table:"koneksi_tablet"};
+  let ch = db.channel("koneksi-"+(sel||"none")+"-"+Date.now());
+  if(sel){
+    ch = ch.on("postgres_changes",Object.assign({event:"INSERT"},base,f?{filter:f}:{}),onRealtime)
+           .on("postgres_changes",Object.assign({event:"UPDATE"},base,f?{filter:f}:{}),onRealtime);
+  }
+  ch = ch.on("postgres_changes",Object.assign({event:"DELETE"},base),onRealtime)
     .subscribe(st=>{
       if(ch!==rt) return; // abaikan event dari channel lama
       if(st==="SUBSCRIBED"){
@@ -398,6 +457,12 @@ function mulaiRealtime(){
       }
     });
   rt = ch;
+}
+// Dipanggil saat tablet yang dipilih berganti -> langganan dibuat ulang dengan filter baru
+function ganti_realtime(){
+  if(rtTimer){ clearTimeout(rtTimer); rtTimer=null; }
+  const lama=rt; rt=null; rtTry=0;
+  (async()=>{ try{ if(lama) await db.removeChannel(lama); }catch(e){} mulaiRealtime(); })();
 }
 function jadwalRealtime(segera){
   if(rtTimer){ if(!segera) return; clearTimeout(rtTimer); }
@@ -461,7 +526,7 @@ if("serviceWorker" in navigator){
     // push masuk saat aplikasi terbuka -> bunyikan alarm keras dalam aplikasi
     if(e.data.type==="push-in" && document.visibilityState==="visible") playSound();
     // langganan push berubah di browser -> daftarkan ulang
-    if(e.data.type==="resub") daftarPush();
+    if(e.data.type==="resub") daftarPush(true);
   });
 }
 loadTablets();
